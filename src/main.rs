@@ -22,6 +22,8 @@ enum Command {
         tags: Option<String>,
         #[structopt(short, long)]
         retain_coordinates: bool,
+        #[structopt(short, long)]
+        meili: bool,
     },
     Streets {
         #[structopt(short, long)]
@@ -30,12 +32,16 @@ enum Command {
         name: Option<String>,
         #[structopt(short, long)]
         boundary: Option<u8>,
+        #[structopt(short, long)]
+        meili: bool,
     },
     Boundaries {
         #[structopt(short, long)]
         geojson: bool,
         #[structopt(short, long)]
         levels: Option<Vec<u8>>,
+        #[structopt(short, long)]
+        meili: bool,
     },
 }
 
@@ -50,6 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Command::Objects {
             tags,
             retain_coordinates,
+            meili
         } => {
             let objects = if let Some(tags) = tags {
                 let groups = filter::parse(&tags);
@@ -57,28 +64,38 @@ fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 objects(file, None, retain_coordinates)?
             };
-            objects.write_json_lines(&mut handle)?;
+
+            if meili {
+                objects.write_meili()?;
+            } else {
+                objects.write_json_lines(&mut handle)?;
+            }
         }
         Command::Streets {
             geojson,
             name,
             boundary,
+            meili
         } => {
             let streets = streets(file, name.as_deref(), boundary)?;
             if geojson {
                 streets.write_geojson(&mut handle)?;
+            } else if meili {
+                streets.write_meili()?;
             } else {
                 streets.write_json_lines(&mut handle)?;
             }
         }
-        Command::Boundaries { levels, geojson } => {
+        Command::Boundaries { levels, geojson, meili } => {
             let boundaries = boundaries(file, levels)?;
             if geojson {
                 boundaries.write_geojson(&mut handle)?;
+            } else if meili {
+                boundaries.write_meili()?;
             } else {
                 boundaries.write_json_lines(&mut handle)?;
             }
-        }
+        },
     }
     Ok(())
 }

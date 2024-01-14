@@ -53,12 +53,12 @@ pub mod osm {
 
     #[derive(Serialize, Deserialize)]
     pub struct Object {
-        id: i64,
+        pub id: i64,
         #[serde(rename = "type")]
-        osm_type: &'static str,
-        tags: Tags,
+        pub osm_type: &'static str,
+        pub tags: Tags,
         #[serde(flatten)]
-        geo_info: GeoInfo,
+        pub geo_info: GeoInfo,
     }
 
     impl Object {
