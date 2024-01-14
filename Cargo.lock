@@ -631,7 +631,7 @@ dependencies = [
 name = "osm_pbf2json"
 version = "0.3.0"
 dependencies = [
- "approx 0.3.2",
+ "approx 0.5.1",
  "criterion",
  "geo",
  "geo-types 0.6.2",
