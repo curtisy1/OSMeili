@@ -1,6 +1,6 @@
 use geo::prelude::*;
 use geo::Closest;
-use geo_types::{Coordinate, Geometry, Line, LineString, MultiPoint, MultiPolygon, Point, Polygon};
+use geo_types::{Coord, Geometry, Line, LineString, MultiPoint, MultiPolygon, Point, Polygon};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 
@@ -55,7 +55,7 @@ impl BoundaryGeometry {
             .map(|line_strings| {
                 line_strings
                     .iter()
-                    .map(|ls| ls.points_iter().map(|p| (p.x(), p.y())).collect())
+                    .map(|ls| ls.points().map(|p| (p.x(), p.y())).collect())
                     .collect()
             })
             .collect()
@@ -112,8 +112,8 @@ impl BoundingBox {
         let sw_padded = sw - padding;
         let ne_padded = ne + padding;
         BoundingBox {
-            sw: [sw_padded.lng(), sw_padded.lat()],
-            ne: [ne_padded.lng(), ne_padded.lat()],
+            sw: [sw_padded.x(), sw_padded.y()],
+            ne: [ne_padded.x(), ne_padded.y()],
         }
     }
 }
@@ -156,7 +156,7 @@ impl SegmentGeometry {
     }
 
     pub fn len(&self) -> usize {
-        self.line_string.points_iter().count()
+        self.line_string.points().count()
     }
 
     pub fn sw_ne(&self) -> ([f64; 2], [f64; 2]) {
@@ -175,8 +175,8 @@ pub trait Length {
 
 impl Length for SegmentGeometry {
     fn length(&self) -> f64 {
-        let sw: Coordinate<f64> = self.bounding_box.sw.into();
-        let ne: Coordinate<f64> = self.bounding_box.ne.into();
+        let sw: Coord<f64> = self.bounding_box.sw.into();
+        let ne: Coord<f64> = self.bounding_box.ne.into();
         let line = Line::new(sw, ne);
         line.euclidean_length()
     }
@@ -192,7 +192,7 @@ impl From<&SegmentGeometry> for Vec<(f64, f64)> {
     fn from(geometry: &SegmentGeometry) -> Vec<(f64, f64)> {
         geometry
             .line_string
-            .points_iter()
+            .points()
             .map(|c| (c.x(), c.y()))
             .collect()
     }
@@ -202,7 +202,7 @@ impl From<SegmentGeometry> for Vec<(f64, f64)> {
     fn from(geometry: SegmentGeometry) -> Vec<(f64, f64)> {
         geometry
             .line_string
-            .points_iter()
+            .points()
             .map(|c| (c.x(), c.y()))
             .collect()
     }
@@ -226,14 +226,14 @@ impl From<Location> for [f64; 2] {
 impl From<Point<f64>> for Location {
     fn from(point: Point<f64>) -> Self {
         Location {
-            lat: point.lat(),
-            lon: point.lng(),
+            lat: point.y(),
+            lon: point.x(),
         }
     }
 }
 
-impl From<Coordinate<f64>> for Location {
-    fn from(coordinate: Coordinate<f64>) -> Self {
+impl From<Coord<f64>> for Location {
+    fn from(coordinate: Coord<f64>) -> Self {
         Location {
             lat: coordinate.y,
             lon: coordinate.x,
@@ -266,8 +266,8 @@ impl Midpoint for Vec<&SegmentGeometry> {
         let centroid = multi_points.centroid()?;
         let closest = multi_points.closest_point(&centroid);
         match closest {
-            Closest::Intersection(p) => Some((p.lng(), p.lat())),
-            Closest::SinglePoint(p) => Some((p.lng(), p.lat())),
+            Closest::Intersection(p) => Some((p.x(), p.y())),
+            Closest::SinglePoint(p) => Some((p.x(), p.y())),
             _ => None,
         }
     }
@@ -290,8 +290,8 @@ impl From<&Bounds> for (Location, Location) {
 
 fn get_geometry(coordinates: &[(f64, f64)]) -> Option<Geometry<f64>> {
     let line_string: LineString<f64> = coordinates.to_vec().into();
-    let first = line_string.points_iter().next()?;
-    let last = line_string.points_iter().last()?;
+    let first = line_string.points().next()?;
+    let last = line_string.points().last()?;
     if first == last {
         let polygon = Polygon::new(line_string, vec![]);
         Some(Geometry::Polygon(polygon))
@@ -350,8 +350,8 @@ pub fn get_compound_coordinates(coordinates: Vec<(f64, f64)>) -> Vec<(f64, f64)>
     let convex_hull = multi_points.convex_hull();
     convex_hull
         .exterior()
-        .points_iter()
-        .map(|p| (p.lng(), p.lat()))
+        .points()
+        .map(|p| (p.x(), p.y()))
         .collect()
 }
 
