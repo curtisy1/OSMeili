@@ -2,7 +2,7 @@
 name = "osm_pbf2json"
 version = "0.3.0"
 authors = ["magnus kulke <mkulke@gmail.com>", "edouard poitras <edouardpoitras@gmail.com>"]
-edition = "2018"
+edition = "2021"
 homepage = "https://github.com/mkulke/osm-pbf2json"
 readme = "Readme.md"
 repository = "https://github.com/mkulke/osm-pbf2json"
