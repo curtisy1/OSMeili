@@ -29,7 +29,7 @@ osm_boundaries_utils = "0.7"
 smartstring = "0.2"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.5"
 approx = "0.5"
 geojson = "0.24"
 
