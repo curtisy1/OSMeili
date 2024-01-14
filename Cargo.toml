@@ -31,7 +31,7 @@ smartstring = "0.2"
 [dev-dependencies]
 criterion = "0.3"
 approx = "0.3"
-geojson = "0.19"
+geojson = "0.24"
 
 [[bench]]
 name = "osm"
