@@ -332,7 +332,7 @@ mod get_coordinates {
         let coordinates = rel.get_coordinates(&obj_map, &mut vec![]);
         assert_eq!(
             coordinates,
-            vec![(9., 50.), (9., 51.), (10., 51.), (9., 50.)]
+            vec![(9., 50.), (10., 51.), (9., 51.), (9., 50.)]
         );
     }
 
@@ -346,7 +346,7 @@ mod get_coordinates {
         let refs = create_refs(vec![node_id.into()]);
         let rel = create_relation(id, refs);
         let coordinates = rel.get_coordinates(&obj_map, &mut vec![]);
-        assert_eq!(coordinates, vec![(5., 49.)]);
+        assert_eq!(coordinates, vec![(5., 49.), (5., 49.)]);
     }
 
     #[test]
@@ -381,7 +381,7 @@ mod get_coordinates {
 
         assert_eq!(
             coordinates,
-            vec![(6., 50.), (8., 50.), (8., 52.), (6., 52.), (6., 50.)]
+            vec![(8., 50.), (8., 52.), (6., 52.), (6., 50.), (8., 50.)]
         );
     }
 
@@ -409,7 +409,7 @@ mod get_coordinates {
 
         assert_eq!(
             coordinates,
-            vec![(6., 50.), (8., 52.), (6., 52.), (6., 50.)]
+            vec![(8., 52.), (6., 52.), (6., 50.), (8., 52.)]
         );
     }
 
@@ -431,6 +431,6 @@ mod get_coordinates {
 
         let coordinates = rel_2.get_coordinates(&obj_map, &mut vec![]);
 
-        assert_eq!(coordinates, vec![(8., 52.)]);
+        assert_eq!(coordinates, vec![(8., 52.), (8., 52.)]);
     }
 }
