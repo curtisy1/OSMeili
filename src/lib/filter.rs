@@ -71,7 +71,9 @@ pub fn parse(selector_str: &str) -> Vec<Group> {
 
 fn check_condition(tags: &Tags, condition: &Condition) -> bool {
     match condition {
-        Condition::TagPresence(key) => tags.contains_key(key.as_str()),
+        Condition::TagPresence(key) => tags.iter().any(|tag| {
+            tag.0.contains(key)
+        }),
         Condition::ValueMatch(key, value) => tags.contains(key, value),
     }
 }
