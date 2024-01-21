@@ -1,5 +1,5 @@
 use osmpbfreader::objects::{OsmObj, Tags};
-use smartstring::alias::String;
+use std::str::FromStr;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Condition {
@@ -7,18 +7,17 @@ pub enum Condition {
     ValueMatch(String, String),
 }
 
-impl Condition {
-    pub fn new(tag: &str, value: Option<&str>) -> Self {
-        if let Some(value) = value {
-            return Condition::ValueMatch(tag.into(), value.into());
-        }
-        Condition::TagPresence(tag.into())
-    }
-}
-
 #[derive(PartialEq, Debug, Clone)]
 pub struct Group {
     pub conditions: Vec<Condition>,
+}
+
+impl FromStr for Group {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(parse_group(s))
+    }
 }
 
 fn parse_condition(condition_str: &str) -> Condition {
@@ -73,11 +72,11 @@ fn check_group(tags: &Tags, group: &Group) -> bool {
 }
 
 pub trait Filter {
-    fn filter(&self, groups: &[Group]) -> bool;
+    fn filter(&self, groups: &Vec<Group>) -> bool;
 }
 
 impl Filter for OsmObj {
-    fn filter(&self, groups: &[Group]) -> bool {
+    fn filter(&self, groups: &Vec<Group>) -> bool {
         let tags = self.tags();
         groups.iter().any(|c| check_group(tags, c))
     }
