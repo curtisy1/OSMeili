@@ -9,11 +9,11 @@ use tokio::time::sleep;
 
 const MEILI_API_KEY: &str = "346cb8272d48ca98f3ea33b834a8467a7149eb8886a5580a0332eeac9b5abfcd";
 const SEARCHABLE_ATTRIBUTES: [&str; 5] = [
-"street",
-"houseNumber",
-"postcode",
-"city",
-"country"
+    "street",
+    "houseNumber",
+    "postcode",
+    "city",
+    "country"
 ];
 
 #[derive(Serialize, Deserialize)]

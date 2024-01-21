@@ -7,6 +7,15 @@ pub enum Condition {
     ValueMatch(String, String),
 }
 
+impl Condition {
+    pub fn new(tag: &str, value: Option<&str>) -> Self {
+        if let Some(value) = value {
+            return Condition::ValueMatch(tag.into(), value.into());
+        }
+        Condition::TagPresence(tag.into())
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct Group {
     pub conditions: Vec<Condition>,
@@ -107,13 +116,13 @@ mod tests {
         let node = new_node();
         let obj = OsmObj::Node(node);
 
-        assert!(!obj.filter(&[group.clone()]));
+        assert!(!obj.filter(&vec![group.clone()]));
 
         let mut node = new_node();
         node.tags.insert("amenity".into(), "theatre".into());
         let obj = OsmObj::Node(node);
 
-        assert!(obj.filter(&[group]));
+        assert!(obj.filter(&vec![group]));
     }
 
     #[test]
@@ -125,12 +134,12 @@ mod tests {
         let mut node = new_node();
         node.tags.insert("amenity".into(), "theatre".into());
         let obj = OsmObj::Node(node);
-        assert!(obj.filter(&[group.clone()]));
+        assert!(obj.filter(&vec![group.clone()]));
 
         let mut node = new_node();
         node.tags.insert("amenity".into(), "cinema".into());
         let obj = OsmObj::Node(node);
-        assert!(!obj.filter(&[group]));
+        assert!(!obj.filter(&vec![group]));
     }
 
     #[test]
@@ -147,7 +156,7 @@ mod tests {
         node.tags.insert("name".into(), "Waldbühne".into());
         let obj = OsmObj::Node(node);
 
-        assert!(obj.filter(&[group_1, group_2]));
+        assert!(obj.filter(&vec![group_1, group_2]));
     }
 
     #[test]
@@ -163,12 +172,12 @@ mod tests {
         node.tags.insert("name".into(), "Waldbühne".into());
         let obj = OsmObj::Node(node);
 
-        assert!(obj.filter(&[group]));
+        assert!(obj.filter(&vec![group]));
 
         let conditions = vec![condition_2, condition_3];
         let group = Group { conditions };
 
-        assert!(!obj.filter(&[group]));
+        assert!(!obj.filter(&vec![group]));
     }
 
     #[test]

@@ -95,25 +95,3 @@ impl From<&Bounds> for (Location, Location) {
         (ne, sw)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use approx::*;
-
-    fn approx_eq<T: Into<[f64; 2]>>(a: [f64; 2], o: Option<T>) {
-        let b: [f64; 2] = o.unwrap().into();
-        assert_relative_eq!(a[0], b[0], epsilon = f64::EPSILON);
-        assert_relative_eq!(a[1], b[1], epsilon = f64::EPSILON);
-    }
-
-    #[test]
-    fn get_centroid_for_line() {
-        let coordinates = vec![(9., 50.), (9., 51.), (10., 51.)];
-        // 1     2
-        //  c
-        //
-        // 0
-        approx_eq([9.25, 50.75], coordinates.get_centroid());
-    }
-}

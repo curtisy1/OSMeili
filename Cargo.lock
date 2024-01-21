@@ -1123,7 +1123,6 @@ dependencies = [
 name = "osm_pbf2json"
 version = "0.3.0"
 dependencies = [
- "approx",
  "clap",
  "criterion",
  "futures 0.3.30",
