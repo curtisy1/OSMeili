@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use meilisearch_sdk::{Client, TasksSearchQuery};
-use osmpbfreader::{OsmId, OsmObj, Tags};
+use osmpbfreader::{Node, OsmId, OsmObj};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -25,25 +25,37 @@ struct MeiliCoordinate {
 #[derive(Serialize, Deserialize)]
 struct MeiliObject {
     id: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    street: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    postcode: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "houseNumber")]
-    house_number: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    country: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    city: Option<String>,
+
     #[serde(rename = "_geo")]
     geo_info: MeiliCoordinate,
+    //todo: we need a match quality here. Infer from lowest osm type
 }
 
-fn get_address_part(tags: &Tags, address_part: &str) -> Option<String> {
-    if tags.contains_key(address_part) {
-        Some(tags.get(address_part).unwrap().to_string())
-    } else {
-        None
+trait FromOsm {
+    fn from_osm(node: &Node) -> Self;
+}
+
+impl FromOsm for HashMap<String, String> {
+    fn from_osm(node: &Node) -> Self {
+        let mut map: HashMap<String, String> = HashMap::new();
+
+        // first, populate every addr:* tag the node has
+        for tag in node.tags.iter() {
+            if tag.0.starts_with("addr") {
+                let address_part = tag.0.split_terminator(':').last().unwrap().to_string();
+                map.insert(address_part, tag.1.to_string());
+            }
+        }
+
+        // if at least one tag exists, we add the id and coordinates
+        if !map.is_empty() {
+            map.insert(String::from("id"), node.id.0.to_string());
+
+            let geo_info = MeiliCoordinate { lon: node.lon(), lat: node.lat() };
+            map.insert(String::from("_geo"), serde_json::to_string(&geo_info).unwrap());
+        }
+
+        map
     }
 }
 
@@ -56,18 +68,12 @@ pub async fn import_meili(items: BTreeMap<OsmId, OsmObj>) -> Result<(), Box<dyn 
         .filter_map(|obj| {
             match obj {
                 OsmObj::Node(obj) => {
-                    let geo_info = MeiliCoordinate { lon: obj.lon(), lat: obj.lat() };
-                    let tags = &obj.tags;
-                    let object = MeiliObject {
-                        id: obj.id.0,
-                        country: get_address_part(&tags, "addr:country"),
-                        city: get_address_part(&tags, "addr:city"),
-                        postcode: get_address_part(&tags, "addr:postcode"),
-                        street: get_address_part(&tags, "addr:street"),
-                        house_number: get_address_part(&tags, "addr:housenumber"),
-                        geo_info,
-                    };
-                    Some(object)
+                    let map = HashMap::from_osm(obj);
+                    if map.is_empty() {
+                        return None;
+                    }
+
+                    Some(map)
                 }
                 _ => None
             }

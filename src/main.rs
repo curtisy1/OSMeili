@@ -13,10 +13,10 @@ struct Cli {
     #[clap(short, long, env, required = true)]
     source: String,
     /// specify tags to filter on.
-    /// By default addr:country, addr:city, addr:postcode, addr:street, addr:housenumber will be used
+    /// By default addr will be used
     ///
     /// for a list of addr:* tags, see https://wiki.openstreetmap.org/wiki/Key:addr:*
-    #[clap(short, long, env, value_parser = clap::value_parser!(Group), default_value = "addr:city,addr:city,addr:country,addr:housenumber,addr:postcode")]
+    #[clap(short, long, env, value_parser = clap::value_parser!(Group), default_value = "addr")]
     tags: Option<Vec<Group>>,
     /// the source to use for replication.
     /// Like source, it can be set to either local or remote extracts
