@@ -1,13 +1,10 @@
 //! A parser/filter for OSM protobuf bundles.
 
-use filter::{Filter, Group};
-use osmpbfreader::OsmPbfReader;
+use filter::{Group};
 use std::error::Error;
-use std::io::{Read, Seek};
 
 pub mod filter;
 mod geo;
-pub mod items;
 pub mod output;
 
 /// Extract Objects from OSM
@@ -16,17 +13,8 @@ pub mod output;
 ///
 /// Filtering `groups` can be applied to select objects according to their tags.
 pub async fn objects(
-    file: impl Seek + Read,
+    file: String,
     groups: Option<Vec<Group>>,
 ) -> Result<(), Box<dyn Error>> {
-    let mut pbf = OsmPbfReader::new(file);
-
-    let objs = match groups {
-        Some(grps) => pbf.get_objs_and_deps(|obj| obj.filter(&grps))?,
-        None => pbf.get_objs_and_deps(|_| true)?,
-    };
-
-    output::import_meili(objs).await?;
-
-    Ok(())
+    output::import_meili(file, groups).await
 }

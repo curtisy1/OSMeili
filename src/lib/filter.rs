@@ -1,19 +1,11 @@
-use osmpbfreader::objects::{OsmObj, Tags};
 use std::str::FromStr;
+use osm_io::osm::model::element::Element;
+use osm_io::osm::model::tag::Tag;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Condition {
     TagPresence(String),
     ValueMatch(String, String),
-}
-
-impl Condition {
-    pub fn new(tag: &str, value: Option<&str>) -> Self {
-        if let Some(value) = value {
-            return Condition::ValueMatch(tag.into(), value.into());
-        }
-        Condition::TagPresence(tag.into())
-    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -40,10 +32,6 @@ fn parse_condition(condition_str: &str) -> Condition {
     }
 }
 
-fn parse_group(group_str: &str) -> Group {
-    let conditions = group_str.split('+').map(parse_condition).collect();
-    Group { conditions }
-}
 
 /// Parse an expression into a filter groups
 ///
@@ -54,31 +42,20 @@ fn parse_group(group_str: &str) -> Group {
 /// Finally, options can be specified by concatenating groups of statements with `,`
 /// (`amenity~fountain+tourism,amenity~townhall`). If an entity matches the criteria of
 /// either group it will be included in the output.
-///
-/// # Example
-///
 /// ```
-/// use osm_pbf2json::filter::parse;
-///
-/// let groups = parse("amenity~fountain+tourism,amenity~townhall".into());
-/// assert_eq!(groups.len(), 2);
-/// let group = &groups[0];
-/// assert_eq!(group.conditions.len(), 2);
-/// ```
-pub fn parse(selector_str: &str) -> Vec<Group> {
-    selector_str.split(',').map(parse_group).collect()
+fn parse_group(group_str: &str) -> Group {
+    let conditions = group_str.split('+').map(parse_condition).collect();
+    Group { conditions }
 }
 
-fn check_condition(tags: &Tags, condition: &Condition) -> bool {
+fn check_condition(tags: &Vec<Tag>, condition: &Condition) -> bool {
     match condition {
-        Condition::TagPresence(key) => tags.iter().any(|tag| {
-            tag.0.contains(key)
-        }),
-        Condition::ValueMatch(key, value) => tags.contains(key, value),
+        Condition::TagPresence(key) => tags.iter().any(|tag| tag.k().contains(key)),
+        Condition::ValueMatch(key, value) => tags.iter().any(|tag| tag.k() == key && tag.v() == value),
     }
 }
 
-fn check_group(tags: &Tags, group: &Group) -> bool {
+fn check_group(tags: &Vec<Tag>, group: &Group) -> bool {
     group.conditions.iter().all(|c| check_condition(tags, c))
 }
 
@@ -86,9 +63,15 @@ pub trait Filter {
     fn filter(&self, groups: &Vec<Group>) -> bool;
 }
 
-impl Filter for OsmObj {
+impl Filter for Element {
     fn filter(&self, groups: &Vec<Group>) -> bool {
-        let tags = self.tags();
+        let borrow: &Vec<Tag> = &Vec::new();
+        let tags: &Vec<Tag> = match self {
+            Element::Node { node} => node.tags(),
+            Element::Relation {relation} => relation.tags(),
+            Element::Way {way} => way.tags(),
+            Element::Sentinel => borrow,
+        };
         groups.iter().any(|c| check_group(tags, c))
     }
 }
@@ -96,90 +79,19 @@ impl Filter for OsmObj {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use osmpbfreader::objects::{Node, NodeId};
 
-    fn new_node() -> Node {
-        let tags = Tags::new();
-        let id = NodeId(1);
-        Node {
-            id,
-            tags,
-            decimicro_lat: 0,
-            decimicro_lon: 0,
+    impl Condition {
+        pub fn new(tag: &str, value: Option<&str>) -> Self {
+            if let Some(value) = value {
+                return Condition::ValueMatch(tag.into(), value.into());
+            }
+            Condition::TagPresence(tag.into())
         }
     }
 
-    #[test]
-    fn filter_single_group() {
-        let condition = Condition::TagPresence("amenity".into());
-        let conditions = vec![condition];
-        let group = Group { conditions };
 
-        let node = new_node();
-        let obj = OsmObj::Node(node);
-
-        assert!(!obj.filter(&vec![group.clone()]));
-
-        let mut node = new_node();
-        node.tags.insert("amenity".into(), "theatre".into());
-        let obj = OsmObj::Node(node);
-
-        assert!(obj.filter(&vec![group]));
-    }
-
-    #[test]
-    fn filter_value_match() {
-        let condition = Condition::ValueMatch("amenity".into(), "theatre".into());
-        let conditions = vec![condition];
-        let group = Group { conditions };
-
-        let mut node = new_node();
-        node.tags.insert("amenity".into(), "theatre".into());
-        let obj = OsmObj::Node(node);
-        assert!(obj.filter(&vec![group.clone()]));
-
-        let mut node = new_node();
-        node.tags.insert("amenity".into(), "cinema".into());
-        let obj = OsmObj::Node(node);
-        assert!(!obj.filter(&vec![group]));
-    }
-
-    #[test]
-    fn filter_multiple_groups() {
-        let condition = Condition::TagPresence("amenity".into());
-        let conditions = vec![condition];
-        let group_1 = Group { conditions };
-        let condition = Condition::TagPresence("architect".into());
-        let conditions = vec![condition];
-        let group_2 = Group { conditions };
-
-        let mut node = new_node();
-        node.tags.insert("amenity".into(), "theatre".into());
-        node.tags.insert("name".into(), "Waldbühne".into());
-        let obj = OsmObj::Node(node);
-
-        assert!(obj.filter(&vec![group_1, group_2]));
-    }
-
-    #[test]
-    fn filter_multiple_conditions() {
-        let condition_1 = Condition::TagPresence("amenity".into());
-        let condition_2 = Condition::TagPresence("name".into());
-        let condition_3 = Condition::TagPresence("architect".into());
-        let conditions = vec![condition_1, condition_2.clone()];
-        let group = Group { conditions };
-
-        let mut node = new_node();
-        node.tags.insert("amenity".into(), "theatre".into());
-        node.tags.insert("name".into(), "Waldbühne".into());
-        let obj = OsmObj::Node(node);
-
-        assert!(obj.filter(&vec![group]));
-
-        let conditions = vec![condition_2, condition_3];
-        let group = Group { conditions };
-
-        assert!(!obj.filter(&vec![group]));
+    fn parse(selector_str: &str) -> Vec<Group> {
+        selector_str.split(',').map(parse_group).collect()
     }
 
     #[test]

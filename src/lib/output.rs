@@ -1,13 +1,20 @@
 use itertools::Itertools;
 use meilisearch_sdk::{Client, TasksSearchQuery};
-use osmpbfreader::{Node, OsmId, OsmObj};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{HashMap};
 use std::error::Error;
+use std::path::PathBuf;
 use std::time::Duration;
+use futures::{stream, StreamExt};
+use osm_io::osm::model::element::Element;
 use tokio::time::sleep;
+use super::filter::{Filter, Group};
 
-const MEILI_API_KEY: &str = "346cb8272d48ca98f3ea33b834a8467a7149eb8886a5580a0332eeac9b5abfcd";
+use osm_io::osm::pbf::reader::Reader as PbfReader;
+
+const MEILI_API_KEY: &str = "292ffda2c4ac7b457329e812f4003b1280918e0ace980ddcd58a7be7d0f0f3b6";
+const OSM_CHUNK_SIZE: usize = 1000;
+const MAX_PARALLEL_REQUESTS: usize = 10;
 const SEARCHABLE_ATTRIBUTES: [&str; 5] = [
     "street",
     "houseNumber",
@@ -22,36 +29,30 @@ struct MeiliCoordinate {
     lat: f64,
 }
 
-#[derive(Serialize, Deserialize)]
-struct MeiliObject {
-    id: i64,
-
-    #[serde(rename = "_geo")]
-    geo_info: MeiliCoordinate,
-    //todo: we need a match quality here. Infer from lowest osm type
-}
-
-trait FromOsm {
-    fn from_osm(node: &Node) -> Self;
+pub trait FromOsm {
+    fn from_element(node: osm_io::osm::model::node::Node) -> Self;
 }
 
 impl FromOsm for HashMap<String, String> {
-    fn from_osm(node: &Node) -> Self {
+    //todo: we need a match quality here. Infer from lowest osm type
+    fn from_element(node: osm_io::osm::model::node::Node) -> Self {
         let mut map: HashMap<String, String> = HashMap::new();
 
         // first, populate every addr:* tag the node has
-        for tag in node.tags.iter() {
-            if tag.0.starts_with("addr") {
-                let address_part = tag.0.split_terminator(':').last().unwrap().to_string();
-                map.insert(address_part, tag.1.to_string());
+        for tag in node.tags().iter() {
+            let key = tag.k();
+            if key.starts_with("addr") {
+                let address_part = key.split_terminator(':').last().unwrap().to_string();
+                map.insert(address_part, tag.v().to_string());
             }
         }
 
         // if at least one tag exists, we add the id and coordinates
         if !map.is_empty() {
-            map.insert(String::from("id"), node.id.0.to_string());
+            map.insert(String::from("id"), node.id().to_string());
 
-            let geo_info = MeiliCoordinate { lon: node.lon(), lat: node.lat() };
+            let coord = node.coordinate();
+            let geo_info = MeiliCoordinate { lon: coord.lon(), lat: coord.lat() };
             map.insert(String::from("_geo"), serde_json::to_string(&geo_info).unwrap());
         }
 
@@ -59,32 +60,60 @@ impl FromOsm for HashMap<String, String> {
     }
 }
 
-pub async fn import_meili(items: BTreeMap<OsmId, OsmObj>) -> Result<(), Box<dyn Error>> {
+fn filter_osm(element: Element) -> Option<HashMap<String, String>> {
+    match element {
+        Element::Node { node } => {
+            let map = HashMap::from_element(node);
+            if map.is_empty() {
+                return None;
+            }
+
+            Some(map)
+        }
+        _ => None
+    }
+}
+
+
+pub async fn import_meili(
+    file: String,
+    groups: Option<Vec<Group>>
+) -> Result<(), Box<dyn Error>> {
+    let input_path = PathBuf::from(file);
+    let pbf = PbfReader::new(&input_path)?;
     let client = Client::new("http://localhost:7700", Some(MEILI_API_KEY));
 
     // first, we need to import data. Creating search attributes first is not working
-    let objects = items
-        .values()
-        .filter_map(|obj| {
-            match obj {
-                OsmObj::Node(obj) => {
-                    let map = HashMap::from_osm(obj);
-                    if map.is_empty() {
-                        return None;
-                    }
-
-                    Some(map)
+    let chunks = pbf.elements()?.filter_map(|elem| {
+        match &groups {
+            Some(grps) => {
+                if elem.filter(&grps) {
+                    filter_osm(elem)
+                } else {
+                    None
                 }
-                _ => None
-            }
-        });
+            },
+            None => filter_osm(elem)
+        }
+    }).chunks(OSM_CHUNK_SIZE);
 
-    let bodies = client
-        .index("addresses")
-        .add_documents_in_batches(&objects.collect_vec(), None, None)
+    let bodies = stream::iter(&chunks)
+        .map(|chunk| {
+            let client = &client;
+            async move {
+                let objects = chunk.collect_vec();
+                client.index("addresses").add_or_replace(&objects, None).await
+            }
+        })
+        .buffer_unordered(MAX_PARALLEL_REQUESTS);
+
+    let import_successful = bodies
+        .all(|b| async move {
+            b.is_ok()
+        })
         .await;
 
-    if bodies.is_ok() {
+    if import_successful {
         let mut has_pending_task = true;
         while has_pending_task {
             // check if we have processing tasks remaining
