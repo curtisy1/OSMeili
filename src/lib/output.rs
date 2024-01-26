@@ -12,7 +12,7 @@ use super::filter::{Filter, Group};
 
 use osm_io::osm::pbf::reader::Reader as PbfReader;
 
-const MEILI_API_KEY: &str = "292ffda2c4ac7b457329e812f4003b1280918e0ace980ddcd58a7be7d0f0f3b6";
+const MEILI_API_KEY: &str = "8c10c44323e2b703dd3b838b90a8cfe0ec43fcc06c22f3daf5f07eba958600a1";
 const OSM_CHUNK_SIZE: usize = 1000;
 const MAX_PARALLEL_REQUESTS: usize = 10;
 const SEARCHABLE_ATTRIBUTES: [&str; 5] = [
