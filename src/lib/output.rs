@@ -1,27 +1,21 @@
+use super::filter::{Filter, Group};
+use futures::{stream, StreamExt};
 use itertools::Itertools;
 use meilisearch_sdk::{Client, TasksSearchQuery};
+use osm_io::osm::model::element::Element;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::Duration;
-use futures::{stream, StreamExt};
-use osm_io::osm::model::element::Element;
 use tokio::time::sleep;
-use super::filter::{Filter, Group};
 
 use osm_io::osm::pbf::reader::Reader as PbfReader;
 
 const MEILI_API_KEY: &str = "8c10c44323e2b703dd3b838b90a8cfe0ec43fcc06c22f3daf5f07eba958600a1";
 const OSM_CHUNK_SIZE: usize = 1000;
 const MAX_PARALLEL_REQUESTS: usize = 10;
-const SEARCHABLE_ATTRIBUTES: [&str; 5] = [
-    "street",
-    "houseNumber",
-    "postcode",
-    "city",
-    "country"
-];
+const SEARCHABLE_ATTRIBUTES: [&str; 5] = ["street", "houseNumber", "postcode", "city", "country"];
 
 #[derive(Serialize, Deserialize)]
 struct MeiliCoordinate {
@@ -52,8 +46,14 @@ impl FromOsm for HashMap<String, String> {
             map.insert(String::from("id"), node.id().to_string());
 
             let coord = node.coordinate();
-            let geo_info = MeiliCoordinate { lon: coord.lon(), lat: coord.lat() };
-            map.insert(String::from("_geo"), serde_json::to_string(&geo_info).unwrap());
+            let geo_info = MeiliCoordinate {
+                lon: coord.lon(),
+                lat: coord.lat(),
+            };
+            map.insert(
+                String::from("_geo"),
+                serde_json::to_string(&geo_info).unwrap(),
+            );
         }
 
         map
@@ -70,48 +70,44 @@ fn filter_osm(element: Element) -> Option<HashMap<String, String>> {
 
             Some(map)
         }
-        _ => None
+        _ => None,
     }
 }
 
-
-pub async fn import_meili(
-    file: String,
-    groups: Option<Vec<Group>>
-) -> Result<(), Box<dyn Error>> {
+pub async fn import_meili(file: String, groups: Option<Vec<Group>>) -> Result<(), Box<dyn Error>> {
     let input_path = PathBuf::from(file);
     let pbf = PbfReader::new(&input_path)?;
     let client = Client::new("http://localhost:7700", Some(MEILI_API_KEY));
 
     // first, we need to import data. Creating search attributes first is not working
-    let chunks = pbf.elements()?.filter_map(|elem| {
-        match &groups {
+    let chunks = pbf
+        .elements()?
+        .filter_map(|elem| match &groups {
             Some(grps) => {
                 if elem.filter(&grps) {
                     filter_osm(elem)
                 } else {
                     None
                 }
-            },
-            None => filter_osm(elem)
-        }
-    }).chunks(OSM_CHUNK_SIZE);
+            }
+            None => filter_osm(elem),
+        })
+        .chunks(OSM_CHUNK_SIZE);
 
     let bodies = stream::iter(&chunks)
         .map(|chunk| {
             let client = &client;
             async move {
                 let objects = chunk.collect_vec();
-                client.index("addresses").add_or_replace(&objects, None).await
+                client
+                    .index("addresses")
+                    .add_or_replace(&objects, None)
+                    .await
             }
         })
         .buffer_unordered(MAX_PARALLEL_REQUESTS);
 
-    let import_successful = bodies
-        .all(|b| async move {
-            b.is_ok()
-        })
-        .await;
+    let import_successful = bodies.all(|b| async move { b.is_ok() }).await;
 
     if import_successful {
         let mut has_pending_task = true;

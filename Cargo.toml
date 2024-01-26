@@ -1,15 +1,15 @@
 [package]
-name = "osm_pbf2json"
-version = "0.3.0"
-authors = ["magnus kulke <mkulke@gmail.com>", "edouard poitras <edouardpoitras@gmail.com>"]
+name = "osm_meili"
+version = "0.1.0"
+authors = ["alexander oberlaender <curtisy@mailbox.org>, magnus kulke <mkulke@gmail.com>", "edouard poitras <edouardpoitras@gmail.com>"]
 edition = "2021"
-homepage = "https://github.com/mkulke/osm-pbf2json"
+homepage = "https://github.com/curtisy1/OSMeili"
 readme = "Readme.md"
-repository = "https://github.com/mkulke/osm-pbf2json"
+repository = "https://github.com/curtisy1/OSMeili"
 license = "MIT"
-keywords = ["osm", "openstreetmap", "geo", "pbf"]
-categories = ["command-line-utilities", "encoding", "parsing", "science"]
-description = "A parser/filter/processor for OSM protobuf bundles"
+keywords = ["osm", "openstreetmap", "geocoding", "pbf"]
+categories = ["science::geo"]
+description = "A (reverse-)geocoder backed by meilisearch"
 
 [dependencies]
 clap = { version = "4.4", features = ["env", "derive"] }
@@ -32,11 +32,7 @@ geojson = "0.24"
 [build-dependencies]
 protobuf-codegen-pure = "2.28"
 
-[lib]
-name = "osm_pbf2json"
-path = "src/lib/mod.rs"
-
 [[bin]]
-name = "osm_pbf2json"
+name = "osm_meili"
 path = "src/main.rs"
 test = false

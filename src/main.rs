@@ -1,5 +1,5 @@
-use clap::{Parser};
-use lib::{filter::{Group}, objects};
+use clap::Parser;
+use lib::{filter::Group, objects};
 use std::error::Error;
 
 mod lib;

@@ -1,6 +1,6 @@
-use std::str::FromStr;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::tag::Tag;
+use std::str::FromStr;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Condition {
@@ -32,7 +32,6 @@ fn parse_condition(condition_str: &str) -> Condition {
     }
 }
 
-
 /// Parse an expression into a filter groups
 ///
 /// Stating a key (`amenity`), will pick all entities which are tagged using that key.
@@ -51,7 +50,9 @@ fn parse_group(group_str: &str) -> Group {
 fn check_condition(tags: &Vec<Tag>, condition: &Condition) -> bool {
     match condition {
         Condition::TagPresence(key) => tags.iter().any(|tag| tag.k().contains(key)),
-        Condition::ValueMatch(key, value) => tags.iter().any(|tag| tag.k() == key && tag.v() == value),
+        Condition::ValueMatch(key, value) => {
+            tags.iter().any(|tag| tag.k() == key && tag.v() == value)
+        }
     }
 }
 
@@ -67,9 +68,9 @@ impl Filter for Element {
     fn filter(&self, groups: &Vec<Group>) -> bool {
         let borrow: &Vec<Tag> = &Vec::new();
         let tags: &Vec<Tag> = match self {
-            Element::Node { node} => node.tags(),
-            Element::Relation {relation} => relation.tags(),
-            Element::Way {way} => way.tags(),
+            Element::Node { node } => node.tags(),
+            Element::Relation { relation } => relation.tags(),
+            Element::Way { way } => way.tags(),
             Element::Sentinel => borrow,
         };
         groups.iter().any(|c| check_group(tags, c))
@@ -88,7 +89,6 @@ mod tests {
             Condition::TagPresence(tag.into())
         }
     }
-
 
     fn parse(selector_str: &str) -> Vec<Group> {
         selector_str.split(',').map(parse_group).collect()
