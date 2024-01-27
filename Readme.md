@@ -53,11 +53,18 @@ A non-exhaustive list of things that are currently missing
 - [ ] Offer admin boundaries and streets (contributions welcome)
 
 ## Special thanks
-- Magnus Kulke for his initial work on [osm-pbf2json](https://github.com/mkulke/osm-pbf2json) which this project is based on
+- Magnus Kulke for his initial work on [osm-pbf2json](https://github.com/mkulke/osm-pbf2json) which this project is based on[^3]
 - Giora Kosoi from navigatorsguild for [osm-io](https://github.com/navigatorsguild/osm-io)
   they also have a similar project trying to replace Nominatim, [check it out](https://github.com/navigatorsguild/osm-admin)
 
+## License
+
+This work is dual-licensed under MIT and EUPL 1.2.
+You must accept with both of them if you use this work.
+
+`SPDX-License-Identifier: MIT AND EUPL-1.2`
 
 [^1]: "Measured with an M1 Macbook Pro running Linux, let me know of your experience"
 [^2]: The import itself takes around 50% of the time.
 After the import is done, indexes are tweaked for better search result quality. If you do not need this, you can disable it.
+[^3]: All code created by original authors is licensed under MIT. See LICENSE.MIT for details

@@ -1,4 +1,5 @@
-use super::filter::{Filter, Group};
+use crate::filter::Filter;
+use crate::settings::Settings;
 use futures::{stream, StreamExt};
 use itertools::Itertools;
 use meilisearch_sdk::{Client, TasksSearchQuery};
@@ -11,11 +12,6 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 use osm_io::osm::pbf::reader::Reader as PbfReader;
-
-const MEILI_API_KEY: &str = "8c10c44323e2b703dd3b838b90a8cfe0ec43fcc06c22f3daf5f07eba958600a1";
-const OSM_CHUNK_SIZE: usize = 1000;
-const MAX_PARALLEL_REQUESTS: usize = 10;
-const SEARCHABLE_ATTRIBUTES: [&str; 5] = ["street", "houseNumber", "postcode", "city", "country"];
 
 #[derive(Serialize, Deserialize)]
 struct MeiliCoordinate {
@@ -74,40 +70,49 @@ fn filter_osm(element: Element) -> Option<HashMap<String, String>> {
     }
 }
 
-pub async fn import_meili(file: String, groups: Option<Vec<Group>>) -> Result<(), Box<dyn Error>> {
-    let input_path = PathBuf::from(file);
+pub async fn import_meili(settings: Settings) -> Result<(), Box<dyn Error>> {
+    let input_path = PathBuf::from(settings.source);
     let pbf = PbfReader::new(&input_path)?;
-    let client = Client::new("http://localhost:7700", Some(MEILI_API_KEY));
+    let client = Client::new("http://localhost:7700", Some(settings.meili_key));
 
+    println!("Starting meili import");
     // first, we need to import data. Creating search attributes first is not working
     let chunks = pbf
         .elements()?
-        .filter_map(|elem| match &groups {
-            Some(grps) => {
-                if elem.filter(&grps) {
-                    filter_osm(elem)
-                } else {
-                    None
-                }
+        .filter_map(|elem| {
+            if elem.filter(&settings.tags) {
+                filter_osm(elem)
+            } else {
+                None
             }
-            None => filter_osm(elem),
         })
-        .chunks(OSM_CHUNK_SIZE);
+        .chunks(settings.import_chunk_size);
 
+    let meili_index = &settings.meili_node_index_name;
     let bodies = stream::iter(&chunks)
         .map(|chunk| {
             let client = &client;
             async move {
                 let objects = chunk.collect_vec();
                 client
-                    .index("addresses")
+                    .index(meili_index)
                     .add_or_replace(&objects, None)
                     .await
             }
         })
-        .buffer_unordered(MAX_PARALLEL_REQUESTS);
+        .buffer_unordered(settings.import_parallel_requests);
 
-    let import_successful = bodies.all(|b| async move { b.is_ok() }).await;
+    let import_successful = bodies
+        .all(|b| async move {
+            match b {
+                Ok(_) => true,
+                Err(e) => {
+                    eprintln!("failed to push document to meili: {}", e);
+                    false
+                }
+            }
+        })
+        .await;
 
     if import_successful {
         let mut has_pending_task = true;
@@ -130,7 +135,7 @@ pub async fn import_meili(file: String, groups: Option<Vec<Group>>) -> Result<()
         // when above is done, create searchable attributes. Exclude the ids here as they mess up house numbers
         client
             .index("addresses")
-            .set_searchable_attributes(&SEARCHABLE_ATTRIBUTES)
+            .set_searchable_attributes(&settings.meili_node_searchable_values)
             .await?;
 
         // geography objects are needed for geofencing. Set up a filter attribute
